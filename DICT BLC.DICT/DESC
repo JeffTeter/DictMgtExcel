@@ -1,0 +1,8 @@
+I Description
+SUBR( "BLC.DICT.SUB", "DESC" )
+
+DESC
+60L
+S
+
+VARCHAR

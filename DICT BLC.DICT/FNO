@@ -1,0 +1,8 @@
+I Field number, attribute
+SUBR( "BLC.DICT.SUB", "FNO" )
+
+FNO
+3R
+M
+
+VARCHAR

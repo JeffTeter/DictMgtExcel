@@ -1,0 +1,8 @@
+I Multivalue association
+SUBR( "BLC.DICT.SUB", "ASSOC" )
+
+ASSOC
+20L
+S
+
+VARCHAR

@@ -1,0 +1,8 @@
+I Delimited output record with all fields                                    
+SUBR( "BLC.DICT.SUB", "DELIM" )    
+                                     
+DELIM                               
+80L                                  
+M                                    
+                                     
+VARCHAR  
