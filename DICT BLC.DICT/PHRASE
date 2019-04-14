@@ -1,0 +1,8 @@
+I Phrase
+SUBR( "BLC.DICT.SUB", "PHRASE" )
+
+PHRASE
+40L
+S
+                                     
+VARCHAR  

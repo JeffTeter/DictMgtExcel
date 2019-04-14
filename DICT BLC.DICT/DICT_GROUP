@@ -1,0 +1,8 @@
+I Dictionary group, numeric, bitwise
+SUBR( "BLC.DICT.SUB", "DICT_GROUP" )
+ 
+DICT_GROUP 
+3R
+S
+
+VARCHAR

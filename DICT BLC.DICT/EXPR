@@ -1,0 +1,8 @@
+I Expression, formula
+SUBR( "BLC.DICT.SUB", "EXPR" )
+
+EXPR 
+40L
+M
+
+VARCHAR

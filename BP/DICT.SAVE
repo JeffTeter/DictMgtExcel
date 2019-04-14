@@ -1,0 +1,279 @@
+PROGRAM DICT.LOAD
+!     @@Program: DICT.LOAD
+!      @@Author: JTETER
+!        @@Date: 10-06-18
+!     @@Library: BP
+!    @@Keywords: DICT, LOAD
+!   @@Copyright:
+! @@Description: Load dictionaries from a delimited sequential record to a multivalue file
+!
+! @@Stamp:
+!
+! @@Log {
+! Modification history
+! Mod 00    10-06-2018     devjjt      Created
+! }
+! @@Documentation {
+!
+!     Syntax:
+!           DICT.LOAD source_file source_rec target_file
+!
+!     Parameters: (all parameters are required)
+!           source_file       The file in which a delimited file of
+!                             dictionaries is stored. This must be a
+!                             Type 19 file.
+!           source_rec        The sequential file containing dictionary
+!                             information
+!           target_file       Multivalue file or full path to which the
+!                             data will be loaded.
+! }
+! @@Warnings {
+! }
+! @@ToDo {
+!
+! }
+PREAMBLE: * Insert INCLUDES or equated files
+
+      * Build equates for source records
+      EQU DICT.ID             TO 1
+      EQU DICT.TYPE           TO 2
+      EQU DICT.FNO            TO 3
+      EQU DICT.DICT_GROUP     TO 4
+      EQU DICT.CONV           TO 5
+      EQU DICT.PHRASE         TO 6
+      EQU DICT.DESC           TO 7
+      EQU DICT.COLHEAD        TO 8
+      EQU DICT.LENGTH         TO 9
+      EQU DICT.JUSTIFY        TO 10
+      EQU DICT.SM             TO 11
+      EQU DICT.EXPR           TO 12
+      EQU DICT.ASSOC          TO 13
+      EQU DICT.SQL_TYPE       TO 14
+
+INIT.VARS: * Initialize variables
+
+      INIT.ERRS         = @FALSE
+      CNT.READ          = 0
+      CNT.WRITE         = 0
+      CNT.ERR           = 0
+      DELIM.TAB         = CHAR( 009 )           ;* TAB
+      DELIM.ALT         = '~'                   ;* Alternate delimiter used
+      UV.FSEP           = '/'                   ;* UniVerse folder separator
+      SOURCE.FILE.NAME  = ''
+      SOURCE.FILE.PATH  = ''
+      SOURCE.FILE.PATH.FULL = ''
+      TARGET.FILE.NAME  = ''
+
+      GOSUB SENTENCE.PARSE
+
+      IF NOT( INIT.ERRS ) THEN
+         GO PROCESS.FILE
+      END
+
+PROG.END: * Exit here
+
+      CRT 'Read: ' : CNT.READ : ' Write: ' : CNT.WRITE : ' Errors: ' : CNT.ERR
+
+      STOP
+
+!*****************************************
+
+DICT.REC.WRITE: * Write the target record
+
+      WRITE DICT.REC ON TARGET.FILE.PTR, THIS.DICT.ID THEN
+         CNT.WRITE += 1
+      END ELSE
+         CRT 'Cannot write data for ' : THIS.DICT.ID : ' to ' : TARGET.FILE.NAME
+         CNT.ERR += 1
+      END
+
+      RETURN
+
+PROCESS.FILE: * Process the sequential file
+
+      DONE = @FALSE
+      LOOP
+      WHILE READSEQ SOURCE.REC FROM SOURCE.FILE.PTR
+         * Don't parse the header record, if found
+         IF SOURCE.REC[1,3] NE '_ID' THEN
+            CNT.READ += 1
+            GOSUB SOURCE.REC.PARSE
+            IF THIS.DICT.ID NE '' THEN
+               GOSUB DICT.REC.WRITE
+            END
+         END
+      REPEAT
+
+      GOSUB TARGET.FILE.CLOSE
+
+      RETURN
+
+SENTENCE.PARSE: *
+
+      SENTENCE.TXT = TRIM( @SENTENCE )
+
+      IF FIELD( SENTENCE.TXT, ' ', 1 ) = 'RAID' THEN
+         SOURCE.FILE.NAME     = FIELD( SENTENCE.TXT, ' ', 3 )
+         SOURCE.REC.NAME      = FIELD( SENTENCE.TXT, ' ', 4 )
+         TARGET.FILE          = FIELD( SENTENCE.TXT, ' ', 5 )
+      END ELSE
+         SOURCE.FILE.NAME     = FIELD( SENTENCE.TXT, ' ', 2 )
+         SOURCE.REC.NAME      = FIELD( SENTENCE.TXT, ' ', 3 )
+         TARGET.FILE          = FIELD( SENTENCE.TXT, ' ', 4 )
+      END
+
+      GOSUB SOURCE.FILE.OPEN
+      IF NOT( INIT.ERRS ) THEN
+         GOSUB SOURCE.REC.OPENSEQ
+         IF NOT( INIT.ERRS ) THEN
+            GOSUB TARGET.FILE.OPEN
+         END
+      END
+
+      RETURN
+
+SOURCE.FILE.OPEN: * Confirm that the source file exists
+
+      * Check to see if there are folder separators in the TARGET.FILE.NAME
+      CHECK.FILE.OK = @FALSE
+      IF COUNT( SOURCE.FILE.NAME, UV.FSEP ) > 0 THEN
+         OPENPATH SOURCE.FILE.NAME TO CHECK.FILE.PTR ON ERROR
+            CRT 'Error trying to open ' : SOURCE.FILE.NAME : ' - cannot continue'
+            INIT.ERRS = @TRUE
+         END THEN
+            CHECK.FILE.OK = @TRUE
+         END ELSE
+            CRT 'Cannot OPEN ' : SOURCE.FILE.NAME : ' - cannot continue'
+            INIT.ERRS = @TRUE
+         END
+      END ELSE
+         OPEN SOURCE.FILE.NAME TO CHECK.FILE.PTR ON ERROR
+            CRT 'Error trying to open ' : SOURCE.FILE.NAME : ' - cannot continue'
+            INIT.ERRS = @TRUE
+         END THEN
+            CHECK.FILE.OK = @TRUE
+         END ELSE
+            CRT 'Cannot OPEN ' : SOURCE.FILE.NAME : ' - cannot continue'
+            INIT.ERRS = @TRUE
+         END
+      END
+
+      IF CHECK.FILE.OK THEN
+         STATUS SOURCE.FILE.INFO FROM CHECK.FILE.PTR THEN
+            SOURCE.FILE.PATH = SOURCE.FILE.INFO( 27 )
+            * Make sure the path ends in a file separator
+            IF SOURCE.FILE.PATH[1] NE UV.FSEP THEN
+               SOURCE.FILE.PATH := UV.FSEP
+            END
+         END ELSE
+            CRT 'Error getting file information for ' : SOURCE.FILE.NAME : ' - cannot continue'
+            INIT.ERRS = @TRUE
+         END
+      END
+
+      RETURN
+
+SOURCE.REC.OPENSEQ: * Open the sequential input file
+
+      SOURCE.FILE.PATH.FULL = SOURCE.FILE.PATH : SOURCE.REC
+
+      OPENSEQ SOURCE.FILE.PATH.FULL TO SOURCE.FILE.PTR ON ERROR
+         CRT 'Error trying to OPENSEQ ' : SOURCE.FILE.PATH.FULL
+         INIT.ERRS = @TRUE
+      END THEN
+         CRT 'Cannot OPENSEQ ' : SOURCE.FILE.PATH.FULL
+         INIT.ERRS = @TRUE
+      END
+
+      RETURN
+
+SOURCE.REC.PARSE: * Get the information from the source record
+
+      DICT.REC = ''
+
+      * Convert the source record to a multivalue record
+      CONVERT DELIM.TAB TO @AM IN SOURCE.REC
+      CONVERT DELIM.ALT TO @VM IN SOURCE.REC
+
+      THIS.DICT.ID      = SOURCE.REC< DICT.ID >
+      THIS.DICT.TYPE    = SOURCE.REC< DICT.TYPE >
+
+      BEGIN CASE
+         CASE THIS.DICT.TYPE = 'ATTRIBUTE'
+            DICT.REC< 1 >     = TRIM( 'A ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+            DICT.REC< 2 >     = SOURCE.REC< DICT.FNO >
+            DICT.REC< 3 >     = SOURCE.REC< DICT.COLHEAD >
+            DICT.REC< 4 >     = SOURCE.REC< DICT.ASSOC >
+            DICT.REC< 5 >     = SOURCE.REC< DICT.SM >
+            DICT.REC< 6 >     = SOURCE.REC< DICT.SQL_TYPE >
+            DICT.REC< 7 >     = SOURCE.REC< DICT.CONV >
+            DICT.REC< 8 >     = SOURCE.REC< DICT.EXPR >
+            DICT.REC< 9 >     = SOURCE.REC< DICT.JUSTIFY >
+            DICT.REC< 10 >    = SOURCE.REC< DICT.LENGTH >
+
+         CASE THIS.DICT.TYPE = 'FIELD'          ;* 'D' or 'I'
+            IF SOURCE.REC< DICT.EXPR > NE '' THEN
+               DICT.REC< 1 > = TRIM( 'I ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+               DICT.REC< 2 > = SOURCE.REC< DICT.EXPR >
+            END ELSE
+               DICT.REC< 1 > = TRIM( 'D ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+               DICT.REC< 2 > = SOURCE.REC< DICT.FNO >
+            END
+            DICT.REC< 3 >     = SOURCE.REC< DICT.CONV >
+            DICT.REC< 4 >     = SOURCE.REC< DICT.COLHEAD >
+            DICT.REC< 5 >     = SOURCE.REC< DICT.LENGTH > : SOURCE.REC< DICT.JUSTIFY >
+            DICT.REC< 6 >     = SOURCE.REC< DICT.ASSOC >
+            DICT.REC< 7 >     = SOURCE.REC< DICT.ASSOC >
+            DICT.REC< 8 >     = SOURCE.REC< DICT.SQL_TYPE >
+
+         CASE THIS.DICT.TYPE = 'PHRASE'
+            DICT.REC< 1 >     = TRIM( 'PH ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+            DICT.REC< 2 >     = SOURCE.REC< DICT.PHRASE >
+
+         CASE THIS.DICT.TYPE = 'SYNONYM'
+            DICT.REC< 1 >     = TRIM( 'S ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+            DICT.REC< 2 >     = SOURCE.REC< DICT.FNO >
+            DICT.REC< 3 >     = SOURCE.REC< DICT.COLHEAD >
+            DICT.REC< 4 >     = SOURCE.REC< DICT.ASSOC >
+            DICT.REC< 5 >     = SOURCE.REC< DICT.SM >
+            DICT.REC< 6 >     = SOURCE.REC< DICT.SQL_TYPE >
+            DICT.REC< 7 >     = SOURCE.REC< DICT.CONV >
+            DICT.REC< 8 >     = SOURCE.REC< DICT.EXPR >
+            DICT.REC< 9 >     = SOURCE.REC< DICT.JUSTIFY >
+            DICT.REC< 10 >    = SOURCE.REC< DICT.LENGTH >
+
+         CASE THIS.DICT.TYPE = 'USER'
+            IF THIS.DICT.ID NE '@EMPTY.NULL' THEN
+               DICT.REC< 1 >  = TRIM( 'X ' : SOURCE.REC< DICT.DICT_GROUP > : ' ' : SOURCE.REC< DICT.DESC > )
+               DICT.REC< 2 >  = SOURCE.REC< DICT.EXPR >
+            END
+
+         CASE 1   ;* Not a valid type
+            CRT 'Not a valid dictionary type ' : SOURCE.REC< DICT.TYPE >
+            THIS.DICT.ID = ''                   ;* Make it empty to prevent writing
+
+      END CASE
+
+      RETURN
+
+TARGET.FILE.CLOSE: *  Close the target file
+
+      CLOSE TARGET.FILE.PTR
+
+      RETURN
+
+TARGET.FILE.OPEN: * Open the file to which records will be written
+
+      OPEN 'DICT', TARGET.FILE.NAME TO TARGET.FILE.PTR ON ERROR
+         CRT 'ERROR opening DICT ' : TARGET.FILE.NAME
+         INIT.ERRS = @TRUE
+      END ELSE
+         CRT 'Cannot OPEN DICT ' : TARGET.FILE.NAME
+         INIT.ERRS = @TRUE
+      END
+      RETURN
+
+!************************
+! End of PROGRAM
+!************************
+

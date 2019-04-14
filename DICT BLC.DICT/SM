@@ -1,0 +1,8 @@
+I Single, Multivalue
+SUBR( "BLC.DICT.SUB", "SM" )
+
+SM
+1L                                  
+S                                     
+
+VARCHAR

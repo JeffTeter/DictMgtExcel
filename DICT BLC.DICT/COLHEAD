@@ -1,0 +1,8 @@
+I Column heading with value marks converted to tilde (~)
+SUBR( "BLC.DICT.SUB", "COLHEAD" )
+
+COLHEAD
+20L
+S
+
+VARCHAR

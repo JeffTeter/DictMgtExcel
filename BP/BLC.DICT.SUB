@@ -1,0 +1,431 @@
+SUBROUTINE BLC.DICT.SUB( VAR.BACK, SECTION )
+!        @@Name: BLC.DICT.SUB
+!      @@Author: J Teter
+!        @@Date: 07-19-18
+!     @@Library: WBP
+!    @@Keywords: DICT, BLC
+!   @@Copyright:
+! @@Description: Get parts of dictionaries
+!
+! @@Stamp: Last modified by COM (devjjt) at 20:00 on 04-13-2019.
+!
+! @@Log {
+! Modification History
+! Mod 00    04-13-2019        devjjt      Created 
+!
+! }
+!**************************************
+! @@Documentation {
+! This subroutine is used in I-type dictionaries to derive specified
+! components from dictionary records. The dictionaries are in a special
+! file called BLC.DICT and they are based on utilities provided as open
+! source items from Brian Leach consulting.
+!
+!  Dictionary Types Recognized
+!     Style       Reference   Description
+!     UniVerse
+!           'D'   'FIELD'     Data dictionaries
+!           'I'   'FIELD'     Interpreted (formulas)
+!           'PH'  'PHRASE'    Phrases. Create a view with a group of
+!                             dictionaries
+!           'X'   'USER'      User specified values
+!     Pick
+!           'A'   'ATTRIBUTE' Data definitions
+!           'S'   'SYNONYM'   Calculated values
+!
+!  SECTION options
+!     The following options may be used for the SECTION argument to specify
+!     the data to return for the particular dictionary:
+!
+!     ASSOC       Multivalue association
+!     COLHEAD     The column header for reporting. Any value marks are
+!                 replaced with '~' characters
+!     CONV        Output conversion
+!     DELIM       Creates a record with all fields delimited by tabs
+!     DESC        Description of the dictionary. This appears on line 1 of
+!                 the dictionary after the type. There may be a number at
+!                 the beginning of the line. This indicates the dictionary
+!                 group to which this dictionary is to be written
+!     DICT_GROUP  Dictionary group or groups. The groups are defined in a
+!                 CODES table called DICT_GROUP. The number may be a sum
+!                 several groups.
+!     EXPR        A formula that gathers information for output
+!     FNO         A field number (attribute number within a UniVerse file)
+!     FULL        Creates a record with all fields in text form
+!     JUSTIFY     The field justification. Valid options are:
+!                 'C'   Centered Centered
+!                 'L'   Left     Left justified
+!                 'R'   Right    Right justified
+!                 'T'   Text     Wrapped text, breaks between words
+!                 'U'   Text     Left justified, overwrites white space
+!     LENGTH      Data output length
+!     SM          'S'ingle or 'M'ultivalue
+!     SQL_TYPE    SQL data type
+!                 'BIT[,n]'            Bit (optional length)
+!                 'BOOLEAN'
+!                 'CHAR[,n]'           Character (optional length)
+!                 'CHARACTER[,n]'      Character (optional length)
+!                 'DATE'               Date
+!                 'DEC[n,[,s]]'        Integer if s=0, otherwise scaled
+!                                      number
+!                 'DECIMAL[,n[,s]]'    Integer if s=0, otherwise scaled
+!                                      number
+!                 'DOUBLE'             Approximate number
+!                 'FLOAT[,n]'          Approximate number
+!                 'INT'                Integer
+!                 'INTEGER'            Integer
+!                 'NCHAR[,n]'          National character (optional length)
+!                 'NCHARACTER[,n]'     National character (optional length)
+!                 'NUM[,n[,s]]'        Integer if s=0, otherwise scaled
+!                                      number
+!                 'NUMBER[,n[,s]]'     Integer if s=0, otherwise scaled
+!                                      number
+!                 'REAL'               Approximate number
+!                 'SMALLINT'           Integer
+!                 'TIME'               Time
+!                 'VARBIT[,n]'         Bit (optional length)
+!                 'VARCHAR[,n]'        Character (optional length)
+!
+!     Syntax:
+!        This subroutine is used in dictionary records to return information
+!        about a specified dictionary or set of dictionaries. The proper
+!        syntax is to include this in line 2 of an I-type dictionary
+!        with the following structure:
+!           SUBR( "BLC.DICT.SUB", "SECTION" )
+!
+!        The I-type dictionary will call the subroutine. A variable,
+!        identified as VARBACK will be initialized as blank and the data
+!        requested will be returned via this variable. The SECTION variable
+!        must be one of the components identified above.
+!
+!        Note that the "DELIM" option returns a string of fields delimited
+!        by tabs. The delimited record returns data for the following
+!        sections:
+!           DICT_TYPE
+!           FNO
+!           DICT_GROUP
+!           CONV
+!           PHRASE
+!           DESC
+!           COLHEAD
+!           LENGTH
+!           JUSTIFY
+!           SM
+!           EXPR
+!           ASSOC
+!           SQL_TYPE
+!
+!        The "FULL" option returns the complete dictionary record in text
+!        form. The full record returns the following information, in order.
+!        If any fields are blank, they will be truncated:
+!           DICT_TYPE
+!           FNO
+!           CONV
+!           PHRASE
+!           DESC
+!           COLHEAD
+!           EXPR
+!           LENGTH
+!           JUSTIFY
+!           SM
+!           ASSOC
+!           SQL_TYPE
+!
+!     Examples:
+!     1. Create a dictionary to return the column header for dictionaries
+!
+!        ED DICT BLC.DICT COLHEAD
+!        001 I
+!        002 SUBR( "BLC.DICT.SUB", "COLHEAD" )
+!        003
+!        004 COLHEAD
+!        005 20L
+!        006 M
+!        007
+!        008 VARCHAR
+!
+!     2. Create a dictionary to return all dictionary fields in a delimited
+!        format.
+!
+!        ED DICT BLC.DICT DELIM
+!        001 I
+!        002 SUBR( "BLC.DICT.SUB", "DELIM" )
+!        003
+!        004 DELIM
+!        005 80L
+!        006 S
+!        007
+!        008 VARCHAR
+!
+! }
+! @@Warnings {
+! }
+! @@ToDo {
+! }
+
+START.HERE: *
+
+      DELIM.ALT   = '~'
+      DELIM.TAB   = CHAR(009)
+
+      VAR.BACK    =-''
+      * Determine which type of dictionary
+      DICT_TYPE   = ''
+      BEGIN CASE
+         CASE @RECORD<1>[1,1] = 'D'
+            DICT_TYPE = 'FIELD'
+         CASE @RECORD<1>[1,1] = 'I'
+            DICT_TYPE = 'FIELD'
+         CASE @RECORD<1>[1,1] = 'A'
+            DICT_TYPE = 'ATTRIBUTE'
+         CASE @RECORD<1>[1,1] = 'S'
+            DICT_TYPE = 'SYNONYM'
+         CASE @RECORD<1>[1,2] = 'PH'
+            DICT_TYPE = 'PHRASE'
+         CASE @RECORD<1>[1,1] = 'X'
+            DICT_TYPE = 'USER'
+         CASE @ID = '@EMPTY.NULL'
+            DICT_TYPE = 'USER'
+         CASE 1
+            DICT_TYPE = ''
+      END CASE
+
+      ASSOC          = ''
+      COLHEAD        = ''
+      CONV           = ''
+      DESC           = ''
+      DICT_GROUP     = ''
+      EXPR           = ''
+      FNO            = ''
+      JUSTIFY        = ''
+      LENGTH         = ''
+      PHRASE         = ''
+      SM             = ''
+      SQL_TYPE       = ''
+
+      * Check for the data to be returned
+      IF SECTION = 'ASSOC' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD'
+               ASSOC = @RECORD<7>
+            CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+               ASSOC = @RECORD<4>
+         END CASE
+      END
+
+      IF SECTION = 'COLHEAD' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD' OR DICT_TYPE = 'USER'
+               COLHEAD = @RECORD<4>
+            CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+               COLHEAD = @RECORD<3>
+         END CASE
+         * Convert any value marks to pipes
+         CONVERT @VM TO DELIM.ALT IN COLHEAD
+      END
+
+      IF SECTION = 'CONV' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD' OR DICT_TYPE = 'USER'
+               CONV = @RECORD<3>
+            CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+               CONV = @RECORD<7>
+         END CASE
+      END
+
+      IF SECTION = 'DESC' OR SECTION = 'DICT_GROUP' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         DESC = FIELD( @RECORD<1>, ' ', 2, 9999)
+         CHECK.FIELD = FIELD( DESC, ' ', 1 )
+         IF NUM( CHECK.FIELD ) THEN
+            DICT_GROUP = CHECK.FIELD
+            DESC       = FIELD( DESC, ' ', 2, 9999 )
+         END
+         CONVERT @VM TO DELIM.ALT IN DESC
+      END
+
+      IF SECTION = 'EXPR' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+           CASE @RECORD<1>[1,1] = 'I'
+              EXPR = @RECORD<2>
+           CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+              EXPR = @RECORD<8>
+         END CASE
+         CONVERT @VM TO DELIM.ALT IN EXPR
+      END
+
+      IF SECTION = 'FNO' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE @RECORD<1>[1,1] = 'D' OR DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM' OR DICT_TYPE = 'USER'
+              FNO = @RECORD<2>
+         END CASE
+      END
+
+      IF SECTION = 'JUSTIFY' OR SECTION = 'LENGTH' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD'
+               * The LENGTH is numeric and at the left of @RECORD<5>.
+               * Anything after the length is the JUSTIFY part.
+               ATTR.5         = @RECORD<5>
+               THIS.LEN       = LEN( ATTR.5 )
+               LEN.FOUND      = @FALSE
+               JUSTIFY.START  = 0
+               FOR TL = 1 TO THIS.LEN UNTIL LEN.FOUND
+                  IF NOT( NUM( ATTR.5[TL,1] )) THEN
+                     LEN.FOUND      = @TRUE
+                     JUSTIFY.START  = TL
+                  END ELSE
+                     LENGTH := ATTR.5[TL,1]
+                  END
+               NEXT TL
+               JUSTIFY = ATTR.5[JUSTIFY.START,99]
+
+            CASE DICT_TYPE = 'SYNONYM' OR DICT_TYPE = 'ATTRIBUTE'
+               JUSTIFY = @RECORD<9>
+               LENGTH = @RECORD<10>
+         END CASE
+      END
+
+      IF SECTION = 'PHRASE' OR SECTION = 'FULL' OR SECTION = 'DELIM'THEN
+         IF DICT_TYPE = 'PHRASE' THEN
+            PHRASE = @RECORD<2>
+         END
+      END
+
+      IF SECTION = 'SM' OR SECTION = 'FULL' OR SECTION = 'DELIM' THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD'
+               SM = @RECORD<6>
+            CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+               SM = @RECORD<5>
+         END CASE
+      END
+
+      IF SECTION = 'SQL_TYPE' OR SECTION = 'FULL' OR SECTION = 'DELIM'THEN
+         BEGIN CASE
+            CASE DICT_TYPE = 'FIELD'
+               SQL_TYPE = @RECORD<8>
+            CASE DICT_TYPE = 'ATTRIBUTE' OR DICT_TYPE = 'SYNONYM'
+               SQL_TYPE = @RECORD<6>
+         END CASE
+      END
+
+      * Now, create the output
+      BEGIN CASE
+         CASE SECTION = 'ASSOC'
+            VAR.BACK = ASSOC
+
+         CASE SECTION = 'COLHEAD'
+            VAR.BACK = COLHEAD
+
+         CASE SECTION = 'CONV'
+            VAR.BACK = CONV
+
+         CASE SECTION = 'DELIM'
+
+            VAR.BACK     = @ID
+            VAR.BACK    := DELIM.TAB : DICT_TYPE
+            VAR.BACK    := DELIM.TAB : FNO
+            VAR.BACK    := DELIM.TAB : DICT_GROUP
+            VAR.BACK    := DELIM.TAB : CONV
+            VAR.BACK    := DELIM.TAB : PHRASE
+            VAR.BACK    := DELIM.TAB : DESC
+            VAR.BACK    := DELIM.TAB : COLHEAD
+            VAR.BACK    := DELIM.TAB : LENGTH
+            VAR.BACK    := DELIM.TAB : JUSTIFY
+            VAR.BACK    := DELIM.TAB : SM
+            VAR.BACK    := DELIM.TAB : EXPR
+            VAR.BACK    := DELIM.TAB : ASSOC
+            VAR.BACK    := DELIM.TAB : SQL_TYPE
+
+         CASE SECTION = 'DESC'
+            VAR.BACK = DESC
+
+         CASE SECTION = 'DICT_GROUP'
+            VAR.BACK = DICT_GROUP
+
+         CASE SECTION = 'EXPR'
+            VAR.BACK = EXPR
+
+         CASE SECTION = 'FNO'
+            VAR.BACK = FNO
+
+         CASE SECTION = 'FULL'
+            VAR.BACK = @ID
+
+            IF TRIM( DICT_TYPE ) NE '' THEN
+               VAR.BACK := DICT_TYPE
+            END
+
+            IF TRIM( FNO ) NE '' THEN
+               VAR.BACK := ' FNO ' : FNO
+            END
+
+            IF TRIM( CONV ) NE '' THEN
+               VAR.BACK := ' CONV \' : CONV : '\'
+            END
+
+            IF TRIM( PHRASE ) NE '' THEN
+               VAR.BACK := ' PHRASE \' : PHRASE : '\'
+            END
+
+            IF TRIM( DESC ) NE '' THEN
+               VAR.BACK := ' DESC \' : DESC : '\'
+            END
+
+            IF TRIM( COLHEAD ) NE '' THEN
+               VAR.BACK := ' COLHEAD \' : COLHEAD : '\'
+            END
+
+            IF TRIM( EXPR ) NE '' THEN
+               VAR.BACK := ' EXPR \' : EXPR : '\'
+            END
+
+            IF TRIM( JUSTIFY ) NE '' THEN
+               VAR.BACK := ' JUST ' : JUSTIFY
+            END
+            IF TRIM( LENGTH ) NE '' THEN
+              VAR.BACK := ' LEN ' : LENGTH
+            END
+
+            IF TRIM( JUSTIFY ) NE '' THEN
+               VAR.BACK := ' JUST ' : JUSTIFY
+            END
+
+            IF TRIM( SM ) NE '' THEN
+               VAR.BACK := ' SM ' : SM
+            END
+
+            IF TRIM( ASSOC ) NE '' THEN
+               VAR.BACK := 'ASSOC ' : ASSOC
+            END
+
+            IF TRIM( SQL_TYPE ) NE '' THEN
+               VAR.BACK := ' SQL_TYPE ' : SQL_TYPE
+            END
+
+         CASE SECTION = 'JUSTIFY'
+            VAR.BACK = JUSTIFY
+
+         CASE SECTION = 'LENGTH'
+            VAR.BACK = LENGTH
+
+         CASE SECTION = 'PHRASE'
+            VAR.BACK = PHRASE
+
+         CASE SECTION = 'SM'
+            VAR.BACK = SM
+
+         CASE SECTION = 'SQL_TYPE'
+            VAR.BACK = SQL_TYPE
+
+         CASE SECTION = 'TYPE'
+            VAR.BACK = DICT_TYPE
+
+      END CASE
+
+      RETURN
+
+!**************************************
+! End of SUBROUTINE
+!**************************************
+

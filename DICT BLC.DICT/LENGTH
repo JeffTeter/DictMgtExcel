@@ -1,0 +1,8 @@
+I Length
+SUBR( "BLC.DICT.SUB", "LENGTH" )
+
+LENGTH
+3R
+S 
+
+VARCHAR

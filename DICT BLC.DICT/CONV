@@ -1,0 +1,8 @@
+I Output conversion                                    
+SUBR( "BLC.DICT.SUB", "CONV" )    
+                                     
+CONV                              
+10L                                  
+M                                    
+                                     
+VARCHAR  

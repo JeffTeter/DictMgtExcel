@@ -1,0 +1,8 @@
+I SQL type
+SUBR( "BLC.DICT.SUB", "SQL_TYPE" )
+
+SQL_TYPE
+15L
+S 
+
+VARCHAR

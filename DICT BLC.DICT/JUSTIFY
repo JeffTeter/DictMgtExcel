@@ -1,0 +1,8 @@
+I Justification (L, R, T)
+SUBR( "BLC.DICT.SUB", "JUSTIFY" )
+
+JUSTIFY
+1L
+S
+
+VARCHAR
